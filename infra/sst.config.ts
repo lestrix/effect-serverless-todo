@@ -28,7 +28,9 @@ export default $config({
       runtime: "nodejs20.x",
       timeout: "30 seconds",
       memory: "512 MB",
-      url: true, // Enable Lambda function URL (simpler than API Gateway for this tutorial)
+      url: {
+        authorization: "none", // Public access (use IAM for production)
+      },
       environment: {
         NODE_ENV: $app.stage,
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
