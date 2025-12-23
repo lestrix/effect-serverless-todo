@@ -36,29 +36,17 @@ export default $config({
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
       },
       nodejs: {
-        install: [
-          "effect",
-          "@effect/platform",
-          "@effect/platform-node",
-          "@effect-aws/lambda",
-          "@effect/schema"
-        ],
         esbuild: {
           external: [
-            "@aws-sdk/*",
-            "effect",
-            "@effect/platform",
-            "@effect/platform-node",
-            "@effect-aws/lambda",
-            "@effect/schema"
+            "@aws-sdk/*"
           ],
-          minify: true,
-          sourcemap: false,
+          minify: false,
+          sourcemap: true,
           bundle: true,
           platform: "node",
           target: "node20",
+          format: "esm",
           mainFields: ["module", "main"],
-          conditions: ["import", "module", "require"],
         },
       },
     });
