@@ -34,13 +34,23 @@ export default $config({
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
       },
       nodejs: {
-        install: ["effect", "@effect/platform", "@effect/platform-node", "@effect-aws/lambda"],
         esbuild: {
           external: ["@aws-sdk/*"],
           minify: true,
           sourcemap: true,
+          bundle: true,
+          platform: "node",
+          target: "node20",
+          mainFields: ["module", "main"],
+          conditions: ["import", "module", "require"],
         },
       },
+      copyFiles: [
+        {
+          from: "../node_modules",
+          to: "node_modules",
+        },
+      ],
     });
 
     // Frontend static site
