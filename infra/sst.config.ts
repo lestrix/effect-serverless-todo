@@ -22,16 +22,12 @@ export default $config({
     };
   },
   async run() {
-    // Backend Lambda function
+    // Backend Lambda function (without URL - we'll add it separately)
     const api = new sst.aws.Function("Api", {
       handler: "../apps/backend/src/index.handler",
       runtime: "nodejs20.x",
       timeout: "30 seconds",
-      memory: "1024 MB", // Increased to force update
-      url: {
-        authorization: "none", // Public access (use IAM for production)
-        cors: true, // Enable CORS with default settings (handled in Lambda function)
-      },
+      memory: "1024 MB",
       environment: {
         NODE_ENV: $app.stage,
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
@@ -54,13 +50,24 @@ export default $config({
             "@effect/schema"
           ],
           minify: true,
-          sourcemap: false, // Disable sourcemap when externalizing to reduce size
+          sourcemap: false,
           bundle: true,
           platform: "node",
           target: "node20",
           mainFields: ["module", "main"],
           conditions: ["import", "module", "require"],
         },
+      },
+    });
+
+    // Create Lambda Function URL with public access
+    const functionUrl = new aws.lambda.FunctionUrl("ApiFunctionUrl", {
+      functionName: api.name,
+      authorizationType: "NONE",
+      cors: {
+        allowOrigins: ["*"],
+        allowMethods: ["*"],
+        allowHeaders: ["*"],
       },
     });
 
@@ -72,7 +79,7 @@ export default $config({
         output: "dist",
       },
       environment: {
-        VITE_API_URL: api.url,
+        VITE_API_URL: functionUrl.functionUrl,
       },
       // Uncomment to add custom domain
       // domain: $app.stage === "production" ? "todo.yourdomain.com" : undefined,
@@ -80,7 +87,7 @@ export default $config({
 
     // Outputs
     return {
-      api: api.url,
+      api: functionUrl.functionUrl,
       frontend: frontend.url,
     };
   },
