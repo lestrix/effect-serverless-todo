@@ -1621,7 +1621,148 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 
 ---
 
-*Session Status: Awaiting deployment #17/#18 results for Lambda Function URL authorization fix*
+## Session: Lambda Function URL 403 Authorization Fix (FINAL)
+**Date:** 2025-12-23 (Continued)
+**Deployment:** #19-#21
+**Status:** ✅ **AUTHORIZATION FIXED!**
+
+### The Problem
+
+After 18 deployment attempts, the Lambda Function URL continued returning **403 Forbidden** errors despite:
+- Setting `authorization: "none"` in SST config
+- Renaming the function multiple times (Api → ApiV2 → ApiV3)
+- Trying various CORS configurations
+- Increasing memory/timeout to force updates
+
+### The Root Cause
+
+**Lambda Function URLs require TWO separate permissions for public access:**
+
+1. **`lambda:InvokeFunctionUrl`** - Permission to access the function URL endpoint
+2. **`lambda:InvokeFunction`** - Permission to invoke the underlying Lambda function
+
+Our SST config only had the first permission. Even with `authorization: "none"`, Lambda's resource-based policy was blocking invocations because we were missing the second permission.
+
+### The Solution
+
+**Deployment #20:** Added explicit `aws.lambda.Permission` resource (first attempt)
+```typescript
+new aws.lambda.Permission("ApiV4PublicAccess", {
+  action: "lambda:InvokeFunctionUrl",
+  function: api.name,
+  principal: "*",
+  functionUrlAuthType: "NONE",
+});
+```
+**Result:** Still 403 - only added one of the two required permissions
+
+**Deployment #21:** Added BOTH required permissions (successful fix)
+```typescript
+// Permission 1: Access the function URL
+new aws.lambda.Permission("ApiV4UrlPermission", {
+  action: "lambda:InvokeFunctionUrl",
+  function: api.name,
+  principal: "*",
+  functionUrlAuthType: "NONE",
+});
+
+// Permission 2: Invoke the function (THIS WAS MISSING!)
+new aws.lambda.Permission("ApiV4InvokePermission", {
+  action: "lambda:InvokeFunction",
+  function: api.name,
+  principal: "*",
+});
+```
+
+### Verification
+
+**Before (Deployment #1-20):**
+```bash
+$ curl https://.../health
+{"Message":"Forbidden"}  # HTTP 403
+```
+
+**After (Deployment #21):**
+```bash
+$ curl https://tgmsj5wnyluoetjslwimutjgmi0xyrth.lambda-url.eu-central-1.on.aws/health
+Internal Server Error  # HTTP 502
+```
+
+**Success!** Changed from 403 (authorization failure) to 502 (function code error). The authorization layer is now working correctly!
+
+### Key Learnings
+
+1. **SST v3 Limitation:** The `sst.aws.Function` with `url: { authorization: "none" }` does NOT automatically create the required resource-based permissions. You must add them manually using `aws.lambda.Permission` resources.
+
+2. **Two Permissions Required:** Lambda Function URLs need both `InvokeFunctionUrl` AND `InvokeFunction` permissions. This is documented in AWS but not obvious when using IaC tools like SST.
+
+3. **Known SST Issue:** This is a known limitation tracked in GitHub issue [sst/sst#6198](https://github.com/sst/sst/issues/6198).
+
+4. **Event Format Compatibility:** Lambda Function URLs use the same event format as API Gateway HTTP API v2.0, so the handler code should work unchanged (once we fix the 502 error).
+
+### Files Modified (Final Fix)
+
+**infra/sst.config.ts** - Added two Permission resources
+```typescript
+const api = new sst.aws.Function("ApiV4", {
+  // ... existing config ...
+  url: {
+    authorization: "none",
+  },
+});
+
+// CRITICAL: Both permissions required for public access
+new aws.lambda.Permission("ApiV4UrlPermission", {
+  action: "lambda:InvokeFunctionUrl",
+  function: api.name,
+  principal: "*",
+  functionUrlAuthType: "NONE",
+});
+
+new aws.lambda.Permission("ApiV4InvokePermission", {
+  action: "lambda:InvokeFunction",
+  function: api.name,
+  principal: "*",
+});
+```
+
+### Deployment Timeline Summary
+
+| Deployment | Change | Result |
+|------------|--------|---------|
+| #1-#4 | Initial setup, path fixes | Handler not found |
+| #5-#10 | Dependency resolution, esbuild config | Build succeeded |
+| #11-#17 | CORS, auth config attempts | 403 Forbidden |
+| #18 | Improved workflow output parsing | 403 Forbidden |
+| #19 | Renamed to ApiV4, added placeholder permission | 403 Forbidden |
+| #20 | Added InvokeFunctionUrl permission only | 403 Forbidden |
+| #21 | **Added BOTH permissions** | **✅ 502 (Auth works!)** |
+
+### Current Status
+
+**✅ Authorization:** FIXED - Lambda Function URL is publicly accessible
+**⚠️ Function Code:** 502 error - Lambda handler has runtime error (next task)
+
+**URLs:**
+- Frontend: https://d2xr6gl7tr90tf.cloudfront.net
+- API: https://tgmsj5wnyluoetjslwimutjgmi0xyrth.lambda-url.eu-central-1.on.aws/
+
+### References
+
+- [AWS Lambda Function URLs - Control Access](https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html)
+- [SST Issue #6198 - Lambda Function URL Permissions](https://github.com/sst/sst/issues/6198)
+- [AWS Re:Post - Public Function URL 403](https://repost.aws/questions/QUS4tqgsJnSRSQWrCKkAd_sw/public-function-url-returning-a-403-forbidden)
+
+### Next Steps
+
+1. Fix 502 error in Lambda function code (likely event parsing issue)
+2. Test all CRUD operations
+3. Verify CloudWatch logging
+4. Consider migrating to `@effect-aws/lambda`'s `LambdaHandler.toHandler` for better API Gateway/Function URL support
+
+---
+
+*Session Status: ✅ Authorization fixed after 21 deployments! Moving to function code debugging.*
 
 ---
 
