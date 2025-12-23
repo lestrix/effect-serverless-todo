@@ -34,10 +34,24 @@ export default $config({
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
       },
       nodejs: {
+        install: [
+          "effect",
+          "@effect/platform",
+          "@effect/platform-node",
+          "@effect-aws/lambda",
+          "@effect/schema"
+        ],
         esbuild: {
-          external: ["@aws-sdk/*"],
+          external: [
+            "@aws-sdk/*",
+            "effect",
+            "@effect/platform",
+            "@effect/platform-node",
+            "@effect-aws/lambda",
+            "@effect/schema"
+          ],
           minify: true,
-          sourcemap: true,
+          sourcemap: false, // Disable sourcemap when externalizing to reduce size
           bundle: true,
           platform: "node",
           target: "node20",
@@ -45,12 +59,6 @@ export default $config({
           conditions: ["import", "module", "require"],
         },
       },
-      copyFiles: [
-        {
-          from: "../node_modules",
-          to: "node_modules",
-        },
-      ],
     });
 
     // Frontend static site
