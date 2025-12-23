@@ -22,7 +22,9 @@ export const CreateTodoInput = S.Struct({
   completed: S.optional(S.Boolean).pipe(S.withDecodingDefault(() => false)),
 });
 
-export type CreateTodoInput = S.Schema.Type<typeof CreateTodoInput>;
+export type CreateTodoInput = Omit<S.Schema.Type<typeof CreateTodoInput>, 'completed'> & {
+  completed?: boolean;
+};
 
 /**
  * UpdateTodoInput - for PATCH /todos/:id
