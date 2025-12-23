@@ -4,7 +4,7 @@ import type { Todo, CreateTodoInput, UpdateTodoInput } from "@todo/shared";
  * Type-safe API client
  * Uses shared types from @todo/shared to prevent drift
  */
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 class ApiError extends Error {
   constructor(
