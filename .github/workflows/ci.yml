@@ -1,0 +1,119 @@
+name: CI
+
+# When to run this workflow
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop] # Also run on develop branch pushes
+
+# Cancel in-progress runs if a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Code Quality Checks
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm run format:check
+        # Why: Ensures consistent code style across the team
+
+      - name: Lint
+        run: pnpm run lint
+        # Why: Catches common programming errors and enforces best practices
+
+      - name: Type check
+        run: pnpm run typecheck
+        # Why: Ensures TypeScript types are valid across all packages
+
+  # Job 2: Tests
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm run test
+        # Why: Verifies business logic works as expected
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/coverage-final.json
+          fail_ci_if_error: false
+        # Why: Track test coverage over time (requires Codecov setup)
+
+  # Job 3: Build
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm run build
+        # Why: Ensures production builds succeed before merge
+
+      - name: Check bundle size
+        run: |
+          echo "Backend bundle size:"
+          ls -lh apps/backend/dist/
+          echo "Frontend bundle size:"
+          du -sh apps/frontend/dist/
+        # Why: Monitor bundle sizes to prevent bloat
