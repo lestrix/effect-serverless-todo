@@ -30,11 +30,7 @@ export default $config({
       memory: "1024 MB",
       url: {
         authorization: "none",  // Explicitly set public access
-        cors: {
-          allowOrigins: ["*"],
-          allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-          allowHeaders: ["Content-Type"],
-        },
+        cors: true,  // Enable CORS with default settings (allows all origins, methods, headers)
       },
       environment: {
         NODE_ENV: $app.stage,
