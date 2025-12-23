@@ -63,13 +63,22 @@ export default $config({
       },
     });
 
-    // Explicitly add Lambda permission for public function URL access
-    // This is the missing piece - SST may not automatically add this for authorization: "none"
-    new aws.lambda.Permission("ApiV4PublicAccess", {
+    // Explicitly add Lambda permissions for public function URL access
+    // Lambda Function URLs require BOTH permissions for public access:
+    // 1. lambda:InvokeFunctionUrl - for the function URL itself
+    // 2. lambda:InvokeFunction - for the underlying function invocation
+    // Without both, the function URL returns 403 Forbidden even with authorization: "none"
+    new aws.lambda.Permission("ApiV4UrlPermission", {
       action: "lambda:InvokeFunctionUrl",
       function: api.name,
       principal: "*",
       functionUrlAuthType: "NONE",
+    });
+
+    new aws.lambda.Permission("ApiV4InvokePermission", {
+      action: "lambda:InvokeFunction",
+      function: api.name,
+      principal: "*",
     });
 
     // Frontend static site
