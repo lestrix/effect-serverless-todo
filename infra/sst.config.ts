@@ -24,7 +24,7 @@ export default $config({
   async run() {
     // Backend Lambda function
     const api = new sst.aws.Function("Api", {
-      handler: "apps/backend/src/index.handler",
+      handler: "../apps/backend/src/index.handler",
       runtime: "nodejs20.x",
       timeout: "30 seconds",
       memory: "512 MB",
@@ -44,7 +44,7 @@ export default $config({
 
     // Frontend static site
     const frontend = new sst.aws.StaticSite("Frontend", {
-      path: "apps/frontend",
+      path: "../apps/frontend",
       build: {
         command: "pnpm run build",
         output: "dist",
