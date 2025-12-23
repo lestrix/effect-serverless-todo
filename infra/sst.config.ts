@@ -22,6 +22,14 @@ export default $config({
     };
   },
   async run() {
+    // DynamoDB table for persistent todo storage
+    const table = new sst.aws.Dynamo("TodoTable", {
+      fields: {
+        id: "string",
+      },
+      primaryIndex: { hashKey: "id" },
+    });
+
     // Backend Lambda function with public URL
     const api = new sst.aws.Function("ApiV4", {  // Changed name to force recreation with new policy
       handler: "../apps/backend/src/index.handler",
@@ -32,9 +40,11 @@ export default $config({
         authorization: "none",  // Explicitly set public access
         cors: true,  // Enable CORS with default settings (allows all origins, methods, headers)
       },
+      link: [table],
       environment: {
         NODE_ENV: $app.stage,
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
+        TABLE_NAME: table.name,
       },
       nodejs: {
         esbuild: {

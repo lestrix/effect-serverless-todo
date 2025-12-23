@@ -4,15 +4,20 @@ import type {
   Context as LambdaContext,
 } from "aws-lambda";
 import type { Todo } from "@todo/shared";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  PutCommand,
+  GetCommand,
+  DeleteCommand,
+  ScanCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 
-// In-memory storage (will reset on Lambda cold start)
-// Using a mutable structure since Map values need to be updated
-const todos: Map<string, {
-  id: string;
-  title: string;
-  completed: boolean;
-  createdAt: string;
-}> = new Map();
+// DynamoDB setup
+const client = new DynamoDBClient({});
+const dynamodb = DynamoDBDocumentClient.from(client);
+const TABLE_NAME = process.env.TABLE_NAME || "TodoTable";
 
 // Helper: Generate UUID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -45,18 +50,31 @@ export const handler = async (
     // Health check
     if (path === "/health" && method === "GET") {
       console.log("Health check requested");
+
+      // Get count from DynamoDB
+      const scanResult = await dynamodb.send(new ScanCommand({
+        TableName: TABLE_NAME,
+        Select: "COUNT",
+      }));
+
       return jsonResponse({
         status: "ok",
         timestamp: new Date().toISOString(),
         service: "todo-api",
-        todoCount: todos.size,
+        todoCount: scanResult.Count || 0,
       });
     }
 
     // GET /todos - List all todos
     if (path === "/todos" && method === "GET") {
-      console.log("GET /todos - Returning", todos.size, "todos");
-      const todoList = Array.from(todos.values());
+      console.log("GET /todos - Scanning DynamoDB");
+
+      const result = await dynamodb.send(new ScanCommand({
+        TableName: TABLE_NAME,
+      }));
+
+      const todoList = result.Items || [];
+      console.log("GET /todos - Returning", todoList.length, "todos");
       return jsonResponse(todoList);
     }
 
@@ -79,8 +97,12 @@ export const handler = async (
         createdAt: new Date().toISOString(),
       };
 
-      todos.set(id, todo);
-      console.log("Created todo:", todo);
+      await dynamodb.send(new PutCommand({
+        TableName: TABLE_NAME,
+        Item: todo,
+      }));
+
+      console.log("Created todo in DynamoDB:", todo);
       return jsonResponse(todo, 201);
     }
 
@@ -90,14 +112,18 @@ export const handler = async (
       const id = getTodoMatch[1];
       console.log("GET /todos/" + id);
 
-      const todo = todos.get(id);
-      if (!todo) {
-        console.error("Todo not found:", id);
+      const result = await dynamodb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { id },
+      }));
+
+      if (!result.Item) {
+        console.error("Todo not found in DynamoDB:", id);
         return jsonResponse({ error: `Todo with id ${id} not found` }, 404);
       }
 
-      console.log("Found todo:", todo);
-      return jsonResponse(todo);
+      console.log("Found todo:", result.Item);
+      return jsonResponse(result.Item);
     }
 
     // PATCH /todos/:id - Update todo
@@ -105,21 +131,15 @@ export const handler = async (
       const id = getTodoMatch[1];
       console.log("PATCH /todos/" + id);
 
-      const todo = todos.get(id);
-      if (!todo) {
-        console.error("Todo not found:", id);
-        return jsonResponse({ error: `Todo with id ${id} not found` }, 404);
-      }
-
       const body = event.body ? JSON.parse(event.body) : {};
       console.log("Update body:", body);
 
+      // Validate input
       if (body.title !== undefined) {
         if (typeof body.title !== "string" || body.title.trim().length === 0) {
           console.error("Invalid title:", body.title);
           return jsonResponse({ error: "Title must be a non-empty string" }, 400);
         }
-        todo.title = body.title.trim();
       }
 
       if (body.completed !== undefined) {
@@ -127,12 +147,46 @@ export const handler = async (
           console.error("Invalid completed:", body.completed);
           return jsonResponse({ error: "Completed must be a boolean" }, 400);
         }
-        todo.completed = body.completed;
       }
 
-      todos.set(id, todo);
-      console.log("Updated todo:", todo);
-      return jsonResponse(todo);
+      // Build update expression
+      const updateExpressions: string[] = [];
+      const expressionAttributeNames: Record<string, string> = {};
+      const expressionAttributeValues: Record<string, any> = {};
+
+      if (body.title !== undefined) {
+        updateExpressions.push("#title = :title");
+        expressionAttributeNames["#title"] = "title";
+        expressionAttributeValues[":title"] = body.title.trim();
+      }
+
+      if (body.completed !== undefined) {
+        updateExpressions.push("#completed = :completed");
+        expressionAttributeNames["#completed"] = "completed";
+        expressionAttributeValues[":completed"] = body.completed;
+      }
+
+      if (updateExpressions.length === 0) {
+        console.error("No valid fields to update");
+        return jsonResponse({ error: "No valid fields to update" }, 400);
+      }
+
+      const result = await dynamodb.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { id },
+        UpdateExpression: `SET ${updateExpressions.join(", ")}`,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ReturnValues: "ALL_NEW",
+      }));
+
+      if (!result.Attributes) {
+        console.error("Todo not found in DynamoDB:", id);
+        return jsonResponse({ error: `Todo with id ${id} not found` }, 404);
+      }
+
+      console.log("Updated todo in DynamoDB:", result.Attributes);
+      return jsonResponse(result.Attributes);
     }
 
     // DELETE /todos/:id - Delete todo
@@ -140,14 +194,23 @@ export const handler = async (
       const id = getTodoMatch[1];
       console.log("DELETE /todos/" + id);
 
-      const todo = todos.get(id);
-      if (!todo) {
-        console.error("Todo not found:", id);
+      // Check if todo exists before deleting
+      const getResult = await dynamodb.send(new GetCommand({
+        TableName: TABLE_NAME,
+        Key: { id },
+      }));
+
+      if (!getResult.Item) {
+        console.error("Todo not found in DynamoDB:", id);
         return jsonResponse({ error: `Todo with id ${id} not found` }, 404);
       }
 
-      todos.delete(id);
-      console.log("Deleted todo:", id);
+      await dynamodb.send(new DeleteCommand({
+        TableName: TABLE_NAME,
+        Key: { id },
+      }));
+
+      console.log("Deleted todo from DynamoDB:", id);
       return jsonResponse(null, 204);
     }
 
