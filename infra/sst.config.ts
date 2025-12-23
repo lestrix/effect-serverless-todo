@@ -30,11 +30,7 @@ export default $config({
       memory: "1024 MB", // Increased to force update
       url: {
         authorization: "none", // Public access (use IAM for production)
-        cors: {
-          allowOrigins: ["*"],
-          allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-          allowHeaders: ["Content-Type"],
-        },
+        cors: true, // Enable CORS with default settings (handled in Lambda function)
       },
       environment: {
         NODE_ENV: $app.stage,
