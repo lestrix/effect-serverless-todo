@@ -22,12 +22,13 @@ export default $config({
     };
   },
   async run() {
-    // Backend Lambda function (without URL - we'll add it separately)
-    const api = new sst.aws.Function("Api", {
+    // Backend Lambda function with public URL
+    const api = new sst.aws.Function("ApiV2", {  // Changed name to force recreation
       handler: "../apps/backend/src/index.handler",
       runtime: "nodejs20.x",
       timeout: "30 seconds",
       memory: "1024 MB",
+      url: true,  // This defaults to authorization: "none" in SST v3
       environment: {
         NODE_ENV: $app.stage,
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
@@ -60,17 +61,6 @@ export default $config({
       },
     });
 
-    // Create Lambda Function URL with public access
-    const functionUrl = new aws.lambda.FunctionUrl("ApiFunctionUrl", {
-      functionName: api.name,
-      authorizationType: "NONE",
-      cors: {
-        allowOrigins: ["*"],
-        allowMethods: ["*"],
-        allowHeaders: ["*"],
-      },
-    });
-
     // Frontend static site
     const frontend = new sst.aws.StaticSite("Frontend", {
       path: "../apps/frontend",
@@ -79,7 +69,7 @@ export default $config({
         output: "dist",
       },
       environment: {
-        VITE_API_URL: functionUrl.functionUrl,
+        VITE_API_URL: api.url,
       },
       // Uncomment to add custom domain
       // domain: $app.stage === "production" ? "todo.yourdomain.com" : undefined,
@@ -87,7 +77,7 @@ export default $config({
 
     // Outputs
     return {
-      api: functionUrl.functionUrl,
+      api: api.url,
       frontend: frontend.url,
     };
   },
