@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch: # Allow manual triggers
+  workflow_dispatch:
     inputs:
       stage:
         description: 'Deployment stage'
@@ -31,7 +31,6 @@ jobs:
 
     environment:
       name: ${{ github.event.inputs.stage || 'production' }}
-      url: ${{ steps.deploy.outputs.url }}
 
     steps:
       - name: Checkout code
@@ -71,28 +70,69 @@ jobs:
         id: deploy
         run: |
           cd infra
-          pnpm sst deploy --stage ${{ github.event.inputs.stage || 'production' }}
 
-          # Capture outputs
-          echo "url=$(pnpm sst url Frontend --stage ${{ github.event.inputs.stage || 'production' }})" >> $GITHUB_OUTPUT
+          # Deploy and capture output
+          if pnpm sst deploy --stage ${{ github.event.inputs.stage || 'production' }} 2>&1 | tee deploy.log; then
+            echo "deployment_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "deployment_status=failed" >> $GITHUB_OUTPUT
+            echo "❌ Deployment failed. Check logs above."
+            exit 1
+          fi
+
+          # Extract URLs from deployment output (matches Api, ApiV2, ApiV3, etc.)
+          API_URL=$(grep -oP 'Api[^:]*:\s*\Khttps://[^\s]+' deploy.log | head -1 || echo "")
+          FRONTEND_URL=$(grep -oP 'Frontend.*?:\s*\Khttps://[^\s]+' deploy.log | head -1 || echo "")
+
+          # Set outputs only if URLs were found
+          if [ -n "$FRONTEND_URL" ]; then
+            echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+            echo "✅ Frontend deployed to: $FRONTEND_URL"
+          else
+            echo "⚠️  Frontend URL not found in deployment output"
+          fi
+
+          if [ -n "$API_URL" ]; then
+            echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+            echo "✅ API deployed to: $API_URL"
+          else
+            echo "⚠️  API URL not found in deployment output"
+          fi
         env:
-          # SST needs these for state management
           CI: true
 
       - name: Comment PR with deployment info
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.frontend_url
         uses: actions/github-script@v7
         with:
           script: |
+            const frontendUrl = '${{ steps.deploy.outputs.frontend_url }}';
+            const apiUrl = '${{ steps.deploy.outputs.api_url }}';
+
+            let body = '## ✅ Deployment Successful\n\n';
+            if (frontendUrl) {
+              body += `🌐 **Frontend**: ${frontendUrl}\n`;
+            }
+            if (apiUrl) {
+              body += `⚡ **API**: ${apiUrl}\n`;
+            }
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `✅ Deployed to [${{ steps.deploy.outputs.url }}](${{ steps.deploy.outputs.url }})`
-            })
+              body: body
+            });
 
-      - name: Notify deployment success
+      - name: Deployment Summary
         if: success()
         run: |
           echo "🎉 Deployment successful!"
-          echo "Frontend URL: ${{ steps.deploy.outputs.url }}"
+          echo ""
+          echo "📋 Deployment URLs:"
+          if [ -n "${{ steps.deploy.outputs.frontend_url }}" ]; then
+            echo "  Frontend: ${{ steps.deploy.outputs.frontend_url }}"
+          fi
+          if [ -n "${{ steps.deploy.outputs.api_url }}" ]; then
+            echo "  API: ${{ steps.deploy.outputs.api_url }}"
+          fi
