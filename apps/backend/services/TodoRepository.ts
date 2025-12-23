@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Ref } from "effect";
 import { Todo, CreateTodoInput, UpdateTodoInput } from "@todo/shared";
-import { TodoNotFoundError } from "../errors.js";
+import { TodoNotFoundError } from "../src/errors.js";
 
 /**
  * TodoRepository service interface
