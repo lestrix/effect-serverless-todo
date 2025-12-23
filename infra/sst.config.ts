@@ -23,7 +23,7 @@ export default $config({
   },
   async run() {
     // Backend Lambda function with public URL
-    const api = new sst.aws.Function("ApiV3", {  // Changed name again to force recreation
+    const api = new sst.aws.Function("ApiV4", {  // Changed name to force recreation with new policy
       handler: "../apps/backend/src/index.handler",
       runtime: "nodejs20.x",
       timeout: "30 seconds",
@@ -61,6 +61,15 @@ export default $config({
           conditions: ["import", "module", "require"],
         },
       },
+    });
+
+    // Explicitly add Lambda permission for public function URL access
+    // This is the missing piece - SST may not automatically add this for authorization: "none"
+    new aws.lambda.Permission("ApiV4PublicAccess", {
+      action: "lambda:InvokeFunctionUrl",
+      function: api.name,
+      principal: "*",
+      functionUrlAuthType: "NONE",
     });
 
     // Frontend static site
