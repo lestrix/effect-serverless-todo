@@ -1,0 +1,20 @@
+{
+  "semi": true,
+  "singleQuote": false,
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "printWidth": 100
+}
+```
+
+**File:** `.gitignore`
+```
+node_modules/
+dist/
+.sst/
+*.log
+.env
+.env.local
+.DS_Store
+coverage/
+.turbo/

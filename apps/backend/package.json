@@ -1,0 +1,31 @@
+{
+  "name": "@todo/backend",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@todo/shared": "workspace:*",
+    "effect": "^3.11.7",
+    "@effect/platform": "^0.71.3",
+    "@effect/platform-node": "^0.66.3",
+    "@effect-aws/lambda": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^20.14.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
+    "eslint": "^9.15.0"
+  },
+  "scripts": {
+    "dev": "sst dev",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --outfile=dist/index.js --external:@aws-sdk/*",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  }
+}
