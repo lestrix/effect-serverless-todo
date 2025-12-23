@@ -34,6 +34,7 @@ export default $config({
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
       },
       nodejs: {
+        install: ["effect", "@effect/platform", "@effect/platform-node", "@effect-aws/lambda"],
         esbuild: {
           external: ["@aws-sdk/*"],
           minify: true,
@@ -52,14 +53,8 @@ export default $config({
       environment: {
         VITE_API_URL: api.url,
       },
-      domain:
-        $app.stage === "production"
-          ? {
-              // Uncomment and configure if you have a domain
-              // name: "todo.yourdomain.com",
-              // dns: sst.cloudflare.dns(),
-            }
-          : undefined,
+      // Uncomment to add custom domain
+      // domain: $app.stage === "production" ? "todo.yourdomain.com" : undefined,
     });
 
     // Outputs
