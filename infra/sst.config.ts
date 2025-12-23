@@ -23,12 +23,14 @@ export default $config({
   },
   async run() {
     // Backend Lambda function with public URL
-    const api = new sst.aws.Function("ApiV2", {  // Changed name to force recreation
+    const api = new sst.aws.Function("ApiV3", {  // Changed name again to force recreation
       handler: "../apps/backend/src/index.handler",
       runtime: "nodejs20.x",
       timeout: "30 seconds",
       memory: "1024 MB",
-      url: true,  // This defaults to authorization: "none" in SST v3
+      url: {
+        authorization: "none",  // Explicitly set public access
+      },
       environment: {
         NODE_ENV: $app.stage,
         LOG_LEVEL: $app.stage === "production" ? "info" : "debug",
