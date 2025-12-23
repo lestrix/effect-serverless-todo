@@ -7,7 +7,7 @@ import type {
   Context as LambdaContext,
 } from "aws-lambda";
 import { RouterLive } from "./router.js";
-import { TodoRepositoryLive } from "./services/TodoRepository.js";
+import { TodoRepositoryLive } from "../services/TodoRepository.js";
 
 /**
  * AWS Lambda handler

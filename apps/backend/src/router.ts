@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import * as Http from "@effect/platform/HttpServer";
 import * as S from "@effect/schema/Schema";
 import { CreateTodoInput, UpdateTodoInput, ErrorResponse } from "@todo/shared";
-import { TodoRepository } from "./services/TodoRepository.js";
+import { TodoRepository } from "../services/TodoRepository.js";
 import { TodoNotFoundError, ValidationError } from "./errors.js";
 
 /**
