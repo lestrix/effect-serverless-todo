@@ -27,9 +27,14 @@ export default $config({
       handler: "../apps/backend/src/index.handler",
       runtime: "nodejs20.x",
       timeout: "30 seconds",
-      memory: "512 MB",
+      memory: "1024 MB", // Increased to force update
       url: {
         authorization: "none", // Public access (use IAM for production)
+        cors: {
+          allowOrigins: ["*"],
+          allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+          allowHeaders: ["Content-Type"],
+        },
       },
       environment: {
         NODE_ENV: $app.stage,
